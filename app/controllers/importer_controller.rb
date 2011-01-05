@@ -1,5 +1,6 @@
 require 'fastercsv'
 require 'tempfile'
+require 'iconv'
 
 class ImporterController < ApplicationController
   unloadable
@@ -35,7 +36,14 @@ class ImporterController < ApplicationController
     sample_count = 5
     i = 0
     @samples = []
-    
+	
+	# Detects real encoding and converts as necessary
+	latin = latin_encoding(iip.encoding, iip.csv_data)
+	if latin[:latin]
+			iip.csv_data = latin[:data]
+			iip.encoding = latin[:encoding]
+	end
+	
     FasterCSV.new(iip.csv_data, {:headers=>true,
     :encoding=>iip.encoding, :quote_char=>iip.quote_char, :col_sep=>iip.col_sep}).each do |row|
       @samples[i] = row
@@ -100,8 +108,15 @@ class ImporterController < ApplicationController
     end
     
     # attrs_map is fields_map's invert
-
     attrs_map = fields_map.invert
+	
+	# Detects real encoding and converts as necessary
+	latin = latin_encoding(iip.encoding, iip.csv_data)
+	if latin[:latin]
+			iip.csv_data = latin[:data]
+			iip.encoding = latin[:encoding]
+	end
+	
     FasterCSV.new(iip.csv_data, {:headers=>true, :encoding=>iip.encoding, 
         :quote_char=>iip.quote_char, :col_sep=>iip.col_sep}).each do |row|
 
@@ -210,9 +225,14 @@ class ImporterController < ApplicationController
         end
         h
       end
-
+	  
       if (!issue.save)
         # 记录错误
+		
+		# Log errors on issue saving
+		logger.info "Issue not saved !"
+		issue.errors.each_full { |msg| logger.info msg }
+
         @failed_count += 1
         @failed_issues[@handle_count + 1] = row
       end
@@ -240,6 +260,30 @@ private
 
   def find_project
     @project = Project.find(params[:project_id])
+  end
+  
+  # Add ISO-8859-1 (or Latin1) and ISO-8859-15 (or Latin9) character encoding support by converting to UTF-8
+  def latin_encoding(pencoding, pdata)
+	result = nil
+	convert = false
+	
+	case pencoding
+		when 'L1'
+			csv_data_lat = Iconv.conv("UTF-8", "ISO8859-1", pdata)
+			convert = true
+
+		when 'L9'
+			csv_data_lat = Iconv.conv("UTF-8", "ISO8859-15", pdata)
+			convert = true
+	end
+	
+	if convert
+		result = { :latin => true, :encoding => 'U', :data => csv_data_lat }
+	else
+		result = { :latin => false }
+	end
+	
+	return result
   end
   
 end
