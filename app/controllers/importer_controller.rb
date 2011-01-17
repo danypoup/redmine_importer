@@ -122,8 +122,8 @@ class ImporterController < ApplicationController
 
       project = Project.find_by_name(row[attrs_map["project"]])
       tracker = Tracker.find_by_name(row[attrs_map["tracker"]])
-      status = IssueStatus.find_by_name(row[attrs_map["status"]])
-      author = User.find_by_login(row[attrs_map["author"]])
+      status = IssueStatus.find_by_name(row[attrs_map["status"]]) 
+      author = row[attrs_map["author"]] != nil ? User.find_by_login(row[attrs_map["author"]]) : User.current
       priority = Enumeration.find_by_name(row[attrs_map["priority"]])
       category = IssueCategory.find_by_name(row[attrs_map["category"]])
       assigned_to = User.find_by_login(row[attrs_map["assigned_to"]])
@@ -134,7 +134,7 @@ class ImporterController < ApplicationController
       issue.project_id = project != nil ? project.id : @project.id
       issue.tracker_id = tracker != nil ? tracker.id : default_tracker
       issue.author_id = author != nil ? author.id : User.current.id
-
+	  
       if update_issue
         # custom field
         if !ISSUE_ATTRS.include?(unique_attr.to_sym)
